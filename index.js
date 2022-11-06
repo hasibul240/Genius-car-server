@@ -14,6 +14,21 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
+const varifyToken = (req, res, next) => {
+    const auth_header = req.headers.authorization;
+    if (!auth_header) {
+        return res.status(401).send('Access Denied');
+    }
+    const token = auth_header.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOCKEN_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(403).send('Invalid Token');
+        }
+        req.decoded = decoded;
+        next();
+    });
+};
+
 async function run() {
     try {
         const service_Collection = client.db('genius_car').collection('services');
@@ -21,7 +36,7 @@ async function run() {
 
         app.post('/jwt', (req, res) => {
             const user = req.body;
-            const token = jwt.sign(user, process.env.ACCESS_TOCKEN_SECRET, { expiresIn: '1h' });
+            const token = jwt.sign(user, process.env.ACCESS_TOCKEN_SECRET, { expiresIn: '5s' });
             res.send({ token });
         });
 
@@ -38,7 +53,12 @@ async function run() {
             res.send(service);
         });
 
-        app.get('/orders', async (req, res) => {
+        app.get('/orders', varifyToken, async (req, res) => {
+            const decoded = req.decoded;
+
+            if (decoded.current_user.email !== req.query.email) {
+                return res.status(401).send('Access Denied');
+            }
             let query = {};
             if (req.query.email) {
                 query = { email: req.query.email };
