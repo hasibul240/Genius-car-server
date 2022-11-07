@@ -36,7 +36,7 @@ async function run() {
 
         app.post('/jwt', (req, res) => {
             const user = req.body;
-            const token = jwt.sign(user, process.env.ACCESS_TOCKEN_SECRET, { expiresIn: '5s' });
+            const token = jwt.sign(user, process.env.ACCESS_TOCKEN_SECRET, { expiresIn: '1d' });
             res.send({ token });
         });
 
@@ -57,7 +57,7 @@ async function run() {
             const decoded = req.decoded;
 
             if (decoded.current_user.email !== req.query.email) {
-                return res.status(401).send('Access Denied');
+                return res.status(403).send('Unauthorized Access');
             }
             let query = {};
             if (req.query.email) {
@@ -68,24 +68,23 @@ async function run() {
             res.send(orders);
         });
 
-        app.delete('/orders/:id', async (req, res) => {
-            const query = { _id: ObjectId(req.params.id) };
-            const result = await order_Collection.deleteOne(query);
-            res.send(result);
-        });
-
-        app.patch('/orders/:id', async (req, res) => {
+        app.patch('/orders/:id', varifyToken, async (req, res) => {
             const query = { _id: ObjectId(req.params.id) };
             const updateDoc = { $set: { status: req.body.status } };
-
             const result = await order_Collection.updateOne(query, updateDoc);
             res.send(result);
         });
 
-        app.post('/orders', async (req, res) => {
+        app.post('/orders', varifyToken, async (req, res) => {
             const order = req.body;
             const result = await order_Collection.insertOne(order);
             res.json(result);
+        });
+
+        app.delete('/orders/:id', varifyToken, async (req, res) => {
+            const query = { _id: ObjectId(req.params.id) };
+            const result = await order_Collection.deleteOne(query);
+            res.send(result);
         });
 
     } finally {
